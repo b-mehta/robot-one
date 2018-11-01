@@ -10,15 +10,10 @@ module Tex (
 ) where
 
 
-import Prelude hiding (repeat)
-import Control.Applicative
-import Data.Functor.Identity
+import Prelude hiding (repeat, id, pred)
 import Control.Monad
-import Control.Monad.Writer.Lazy (Writer, tell, runWriter)
-import Data.Monoid
 import Data.List
 import Data.Set (member)
-import Data.Map (Map, (!))
 import qualified Data.Map as Map
 
 import Printing
@@ -34,10 +29,10 @@ class Tex a where
 
 
 instance Tex Function where
-    tex pd (Function "min") = "\\min"
-    tex pd (Function s) = textit s
+    tex _ (Function "min") = "\\min"
+    tex _ (Function s) = textit s
 instance Tex Predicate where
-    tex pd (Predicate s) = textit s
+    tex _ (Predicate s) = textit s
 
 texID :: ID -> String
 texID n = replicate (n-1) '\''
@@ -49,20 +44,20 @@ texVariableNameID s id
     | otherwise = s ++ texID id
 
 texSequenceShort :: PrintingData -> Term -> String
-texSequenceShort pd (VariableTerm (Variable "an" id _ _ _)) = "a_n" ++ texID id
+texSequenceShort _ (VariableTerm (Variable "an" id _ _ _)) = "a_n" ++ texID id
 texSequenceShort pd t = tex pd t
 
 texSequenceElement :: Variable -> String -> String
 texSequenceElement (Variable "an" id _ _ _) s = "a_{" ++ s ++ "}" ++ texID id
 
 instance Tex Dependencies where
-    tex pd (Dependencies [] []) = ""
+    tex _ (Dependencies [] []) = ""
     tex pd (Dependencies ds is) = "[" ++ intercalate "," (map (tex pd) ds ++ (overline . tex pd <$> is)) ++ "]"
 
 instance Tex VariableType where
-    tex pd VTNormal = ""
-    tex pd VTDiamond = {--"^\\bullet " TEMP-} "^\\blacklozenge "
-    tex pd VTBullet = "^\\bullet "
+    tex _ VTNormal = ""
+    tex _ VTDiamond = {--"^\\bullet " TEMP-} "^\\blacklozenge "
+    tex _ VTBullet = "^\\bullet "
 
 instance Tex Variable where
     tex pd (Variable s id _ vtype d) =
@@ -129,37 +124,37 @@ texTuple pd [a] = tex pd a
 texTuple pd as = "(" ++ intercalate "," (tex pd <$> as) ++ ")"
 
 instance Tex Tag where
-    tex pd Vulnerable = "Vuln."
-    tex pd Deleted =  error "A 'Deleted' tag should never be printed."
+    tex _  Vulnerable = "Vuln."
+    tex _  Deleted =  error "A 'Deleted' tag should never be printed."
     tex pd (MovedDownFrom n) =  "From " ++ tex pd n ++ "."
-    tex pd (UsedForwardsWith ns) = "Used with " ++ texSNs ns ++ "."
-    tex pd (UsedBackwardsWith ns) = "Used with " ++ texSNs ns ++ "."
+    tex _  (UsedForwardsWith ns) = "Used with " ++ texSNs ns ++ "."
+    tex _  (UsedBackwardsWith ns) = "Used with " ++ texSNs ns ++ "."
     tex pd (CannotSubstitute ts) = "Cannot subst. " ++ intercalate "," (texTuple pd <$> ts)
 
 instance Tex Statement where
-    tex pd s@(Statement n f ts)
+    tex pd s@(Statement _ _ ts)
         | Deleted `elem` ts = grey (texStatementCore pd s) {--TEMP-} ++ "&" ++ texTagsGrey pd ts
         | otherwise = texStatementCore pd s {--TEMP-} ++ "&" ++ texTags pd ts
 
 
 texStatementBold :: PrintingData -> Statement -> String
-texStatementBold pd s@(Statement n f ts)
+texStatementBold pd s@(Statement _ _ ts)
         | Deleted `elem` ts = grey (textbf . boldmath $ texStatementCore pd s) {--TEMP-} ++ "&" ++ (textbf . boldmath $ texTagsGrey pd ts)
         | otherwise = (textbf . boldmath $ texStatementCore pd s) {--TEMP-} ++ "&" ++ (textbf . boldmath $ texTags pd ts)
 
 texStatementCore :: PrintingData -> Statement -> String
-texStatementCore pd (Statement n f ts) = texSN n ++ ".\\ " ++ math (tex pd f)
+texStatementCore pd (Statement n f _) = texSN n ++ ".\\ " ++ math (tex pd f)
 
 texTags :: PrintingData -> [Tag] -> String
-texTags pd [] = ""
+texTags _ [] = ""
 texTags pd ts = "[" ++ intercalate "; " (tex pd <$> filter (/= Deleted) ts) ++ "]"
 
 texTagsGrey :: PrintingData -> [Tag] -> String
-texTagsGrey pd [] = ""
+texTagsGrey _ [] = ""
 texTagsGrey pd ts = grey ("[" ++ intercalate "; " (tex pd <$> filter (/= Deleted) ts) ++ "]")
 
 instance Tex TableauName where
-    tex pd (TableauName hasDagger id) = "L" ++ show id ++ (guard hasDagger >> "$^\\blacklozenge$")
+    tex _ (TableauName hasDagger id) = "L" ++ show id ++ (guard hasDagger >> "$^\\blacklozenge$")
 
 texTN :: TableauName -> String
 texTN (TableauName hasDagger id) = "L" ++ show id ++ (guard hasDagger >> "$^\\blacklozenge$")
@@ -202,7 +197,7 @@ texTargetBolding :: PrintingData -> [StatementName] -> Target -> String
 texTargetBolding pd ns (Target ps) = intercalate "\\\\\n" $ either f (intercalate "\\hspace{2mm}$\\vee$" . map (texTableauBolding pd ns)) <$> ps where
     f s@(Statement n _ _) | n `elem` ns = texStatementBold pd s
                           | otherwise   = tex pd s
-texTargetBolding _  ns Contradiction = "Contradiction"
+texTargetBolding _  _  Contradiction = "Contradiction"
 
 instance Tex VariableChoice where
     tex pd (VariableChoice v t) = math $ tex pd v ++ " = " ++ tex pd t
