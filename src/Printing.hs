@@ -1,3 +1,10 @@
+{-|
+Module      :Printing
+Stability   :experimental
+
+Patterns for printing TeX
+-}
+
 module Printing
   ( Pattern
   , instantiatePattern
@@ -8,7 +15,7 @@ import Data.Map (Map)
 
 ----------------------------------------------------------------------------------------------------
 
--- | Patterns are strings, with % used to mark holes.
+-- | Patterns are strings, with '%' used to mark holes.
 type Pattern = String
 
 -- | Instantiate a pattern by putting the given strings in holes, in order.

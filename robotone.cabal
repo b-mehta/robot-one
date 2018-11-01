@@ -8,16 +8,16 @@ description:
 library
     build-depends: base, containers, mtl, parsec, transformers, logict
     exposed-modules: Writeup Types TidyingMoves TexBase Tex TestData TestData2
-                   Suspension RobotM Rename Printing Parser Move Match Library
+                   Suspension RobotM Printing Parser Move Match Library
                    Expansion DeletionMoves ApplyingMoves
     hs-source-dirs: src
 
 executable robotone
-    build-depends:   base, containers, logict, parsec, transformers, mtl
+    build-depends:  base, containers, mtl, parsec, transformers, logict
     main-is: Main.hs
     hs-source-dirs: src
     other-modules: Writeup Types TidyingMoves TexBase Tex TestData TestData2
-                   Suspension RobotM Rename Printing Parser Move Match Library
+                   Suspension RobotM Printing Parser Move Match Library
                    Expansion DeletionMoves ApplyingMoves
  
 test-suite test-robotone
@@ -26,5 +26,5 @@ test-suite test-robotone
     main-is: Main.hs
     hs-source-dirs: src
     other-modules: Writeup Types TidyingMoves TexBase Tex TestData TestData2
-                   Suspension RobotM Rename Printing Parser Move Match Library
+                   Suspension RobotM Printing Parser Move Match Library
                    Expansion DeletionMoves ApplyingMoves
