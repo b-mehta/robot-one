@@ -5,20 +5,11 @@ module Expansion (
 ) where
 
 import Prelude hiding ((/))
-import Control.Applicative
-import Control.Arrow
-import Control.Monad
-import Control.Monad.Trans
-import qualified Data.Map as Map
-import Data.Map (Map)
 import Data.Maybe
-import Parser
 
-import Library
 import RobotM
 import Types
 import Match
-import Move
 
 ----------------------------------------------------------------------------------------------------
 
@@ -35,14 +26,14 @@ primaryExpansion' f = do
 
 isUnexpandable :: Formula -> RobotM Bool
 isUnexpandable f = do
-    et <- askLibraryExpansionTable
+    _et <- askLibraryExpansionTable
     pe <- primaryExpansion' f
     return $ isNothing pe
 
 primaryExpansion :: Formula -> RobotM Formula
 primaryExpansion f = do
-    et <- askLibraryExpansionTable
-    rt <- askLibraryRewriteTable
+    _et <- askLibraryExpansionTable
+    _rt <- askLibraryRewriteTable
     pe <- primaryExpansion' f
     (matching, expansion) <- oneOf $ maybeToList pe
     expansion' <- renameFormula expansion

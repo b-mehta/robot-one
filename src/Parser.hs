@@ -6,16 +6,14 @@ module Parser (
 ) where
 
 
-import Control.Applicative hiding (many, (<|>))
 import qualified Data.Map as Map
-import Data.Map (Map, (!))
+import Data.Map (Map)
 
 --import Text.Parsec.Text.Lazy
 import Text.Parsec.String
 import Text.Parsec.Char
 import Text.Parsec.Combinator
 import Text.Parsec.Prim
-import Text.Parsec.Error
 
 import Types
 
@@ -36,10 +34,12 @@ bracketed p = string "(" *> spaces *> p <* spaces <* string ")"
 punct :: String -> Parser String
 punct s = spaces *> string s <* spaces
 
+spaces1 :: Parser String
 spaces1 = many1 space
 
 ----------------------------------------------------------------------------------------------------
 
+conventionalTypes :: Map String Type_
 conventionalTypes = Map.fromList [
     ("a", TPoint),
     ("b", TPoint),
@@ -155,9 +155,11 @@ exists :: Parser Formula
 exists = Exists <$> (string "exists " *> spaces *> sepBy variable spaces1)
                 <*> (punct ".(" *> formula <* spaces <* string ")")
 
+testF, testF2, testF3 :: String
 testF = "forall x.(in(x, intersect(A, B)) => exists delta.(forall y.(lessthan(d(x, y), delta) => in(y, intersect(A, B)))))"
 testF2 = "forall y.(lessthan(d(x, y), delta) => in(y, intersect(A, B)))"
 testF3 = "exists delta.(in(y, intersect(A, B)) & lessthan(d(x, y), delta))"
+
+pu, pe :: String -> Formula
 pu = Parser.parse univCond
 pe = Parser.parse exists
-

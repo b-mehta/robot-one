@@ -4,66 +4,70 @@ module TestData (
 
 import Prelude hiding ((/))
 
-import Control.Arrow
-import Control.Applicative
+import Control.Arrow ((***))
 import qualified Data.Map as Map
 import Data.Map (Map)
 
 import Types
-import Expansion
-import TexBase
 import Parser
-import Tex
-import RobotM
 import Library
-import Writeup
 import Printing
 
+intersectionOpenSets :: Problem
 intersectionOpenSets = Problem
     "If $A$ and $B$ are open sets, then $A \\cap B$ is also open." --"The intersection of two open sets is open."
    ["open(A)",
     "open(B)"]
     "open(intersect(A,B))"
 
+continuousPreimageOpen :: Problem
 continuousPreimageOpen = Problem
     "The pre-image of an open set $U$ under a continuous function $f$ is open."
    ["continuous(f)",
     "open(U)"]
     "open(preimage(f,U))"
 
+compositionContinuousFunctions :: Problem
 compositionContinuousFunctions = Problem
     "If $f$ and $g$ are continuous functions, then $g \\circ f$ is continuous." --"A composition of continuous functions is continuous."
    ["continuous(f)",
     "continuous(g)"]
     "continuous(compose(g,f))"
 
+continuousFunctionsPreserveLimits :: Problem
 continuousFunctionsPreserveLimits = Problem
     "If $f$ is a continuous function and $(a_n) \\to a$, then $(f(a_n)) \\to f(a)$"-- "A continuous function preserves limits."
    ["continuous(f)",
     "tendsto(an,a)"]
     "tendsto(applyfnpointwise(f,an),applyfn(f,a))"
 
+closedSubsetCompleteIsComplete :: Problem
 closedSubsetCompleteIsComplete = Problem
     "A closed subset $A$ of a complete metric space $X$ is complete."
    ["completespace(X)",
     "closedin(A,X)"]
     "complete(A)"
 
+ffminusoneAsubsetA :: Problem
 ffminusoneAsubsetA = Problem "$f(f^{-1}(A))\\subset A$"  [] "subsetof(image(f,preimage(f,A)),A)"
 
+asubsetfminusonefA :: Problem
 asubsetfminusonefA = Problem "$A \\subset f^{-1}(f(A))$" [] "subsetof(A, preimage(f,image(f,A)))"
 
 
+iffInjectionThenfAcapfBsubsetfAcapB :: Problem
 iffInjectionThenfAcapfBsubsetfAcapB = Problem
     "If $f$ is an injection then $f(A)\\cap f(B)\\subset f(A\\cap B)$"
         ["injection(f)"]
         "subsetof(intersect(image(f,A),image(f,B)),image(f,intersect(A,B)))"
 
+intersectionSubgroupsClosed :: Problem
 intersectionSubgroupsClosed = Problem
     "The intersection of two subgroups is a subgroup"
         ["subgroup(H)","subgroup(K)"]
         "forall x y.(in(x,intersect(H,K)) & in(y,intersect(H,K)) => in(product(x,y),intersect(H,K)))"
 
+problems :: [Problem]
 problems = [intersectionOpenSets,
             continuousPreimageOpen,
             compositionContinuousFunctions,
@@ -109,6 +113,7 @@ expansionTable = [(f / allVariablesInFormula f, f') |
 --     of the rewrite table.
 --  (This is only relevant if we introduce sets, etc., so that formulae can be inside terms.)
 
+rewriteTableSource :: [(String, String)]
 rewriteTableSource = [
     ("applyfn(compose(f,g),x)", "applyfn(f,applyfn(g,x))"),
     ("kthterm(applyfnpointwise(f,an),n)", "applyfn(f,kthterm(an,n))")
@@ -180,8 +185,10 @@ adjectivePatterns' = Map.fromList [
     ("cauchy", "Cauchy")
   ]
 
+printingData :: PrintingData
 printingData = PrintingData termPatterns' formulaPatterns' nounPatterns' adjectivePatterns'
 
+library :: Library
 library = Library [
     Result "transitivity" [
         parse formula "lessthan(alpha,beta)",

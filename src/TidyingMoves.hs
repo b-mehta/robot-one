@@ -20,13 +20,11 @@ import Control.Monad
 import Data.Maybe
 import Data.List
 import Data.Map ((!))
-import Debug.Trace
 
 import Prelude hiding ((/))
 import Types
 import Match
 import Move
-import TexBase
 import Tex
 import RobotM
 import Expansion
@@ -42,7 +40,7 @@ peelAndSplitUniversalConditionalTarget = tableauwise onTableau where
 
     {- TODO: make this affect more cases with more than one target?-}
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left (Statement n (UniversalImplies vs as c) _)])) = do
+    onTableau _ s (Tableau tID tVs hs (Target [Left (Statement n (UniversalImplies vs as c) _)])) = do
         as' <- mapM (createStatement STHypothesis) $ markDependencies <$> as
         cs' <- mapM (createStatement STTarget) $ conjuncts c
         return (MoveDescription [n] [Let [vs `BeSuchThat` as']] $ "Apply `let' trick and move premise of universal-conditional target " ++ texSN n ++ " above the line.",
@@ -53,7 +51,7 @@ peelBareUniversalTarget :: MoveType
 peelBareUniversalTarget = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left (Statement n (Forall vs c) _)])) = do
+    onTableau _ s (Tableau tID tVs hs (Target [Left (Statement n (Forall vs c) _)])) = do
         c' <- createStatement STTarget c
         return (MoveDescription [n] [Take vs] $ "pply `let' trick and move premise of universal target " ++ texSN n ++ " above the line.",
                 markBulletedIndependencies vs . s $ Tableau tID (tVs ++ vs) hs (Target [Left c']))
@@ -65,7 +63,7 @@ flipNegativeTarget :: MoveType
 flipNegativeTarget = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left (Statement n (Not f) _)])) = do
+    onTableau _ s (Tableau tID tVs hs (Target [Left (Statement n (Not f) _)])) = do
         h' <- createStatement STHypothesis f
         return (MoveDescription [n] [StubClause "Move negative target"] $
                 "Move negative target " ++ texSN n ++ " above the line and make it positive.",
@@ -78,7 +76,7 @@ flipNegativeHypothesis :: MoveType
 flipNegativeHypothesis = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs Contradiction) = do
+    onTableau _ s (Tableau tID tVs hs Contradiction) = do
         (Statement n (Not f) _, context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
         t <- createStatement STTarget f
@@ -95,7 +93,7 @@ splitConjunctiveTarget :: MoveType
 splitConjunctiveTarget = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         --pick a conjunctive target
         (Left (Statement n (And fs) _), context) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -113,9 +111,9 @@ splitDisjunctiveHypothesis :: MoveType
 splitDisjunctiveHypothesis = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs t) = do
+    onTableau _ s (Tableau tID tVs hs t) = do
         --pick a disjunctive hypothesis
-        (h@(Statement n (Or fs) _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
+        ((Statement n (Or fs) _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
         --turn the disjuncts into new tableaux
         disjunctHs <- mapM (createStatement STHypothesis) fs
@@ -132,7 +130,7 @@ splitDisjunctiveTarget :: MoveType
 splitDisjunctiveTarget = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         --pick a target part which is a single disjunctive statement
         (Left (Statement n (Or fs) _), context) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -185,15 +183,15 @@ matchTargetWithHypothesis :: MoveType
 matchTargetWithHypothesis = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau inheritedHs s (Tableau tID tVs hs (Target ps)) = do
         --pick a hypothesis
-        (Statement n f _, context) <- oneOf . eachUndeletedHypothesisWithContext $ hs ++ inheritedHs
+        (Statement n f _, _) <- oneOf . eachUndeletedHypothesisWithContext $ hs ++ inheritedHs
 
         --and a target
         (Left (Statement n' f' _), targetContext) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
         -- Try to match hypothesis and target
-        matching <- oneOf . maybeToList $ match (f / boundVariablesInFormula f) f'
+        _matching <- oneOf . maybeToList $ match (f / boundVariablesInFormula f) f'
 
         case targetContext [] of
             [] ->  return (MoveDescription [n, n'] [ProofDone] $
@@ -260,17 +258,17 @@ disjunctivePartsOfTargetOf (Tableau _ _ _ (Target [p])) = onPart p where
     onPart :: Either Statement [Tableau] -> Maybe [Statement]
     onPart (Left s) = Just [s]
     onPart (Right ts) = concat <$> mapM disjunctivePartsOfTargetOf ts where
-disjunctivePartsOfTargetOf t = Nothing
+disjunctivePartsOfTargetOf _ = Nothing
 
 matchSingleTargetWithBulletedHypothesis :: MoveType
 matchSingleTargetWithBulletedHypothesis = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t) = do
+    onTableau _inheritedHs s tableau@(Tableau tID tVs hs _) = do
         let bulletedVars = filter isBulletedOrDiamonded tVs
 
         --pick a hypothesis
-        (Statement n f _, context) <- oneOf $ eachUndeletedHypothesisWithContext hs
+        (Statement n f _, _context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
         -- if the targets of the tableau are morally a simple disjunction, extract them.
         disjunctiveTargets <- oneOf . maybeToList $ disjunctivePartsOfTargetOf tableau
@@ -299,19 +297,19 @@ matchBulletedTargets :: MoveType
 matchBulletedTargets = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau inheritedHs s (Tableau tID tVs hs (Target ps)) = do
         let bulletedVars = filter isBulletedOrDiamonded tVs
             visibleHs = filter undeleted $ hs ++ inheritedHs
 
             extend :: [Statement] -> Matching -> Either Statement [Tableau] -> RobotM Matching
-            extend hs m (Left (Statement _ f' _)) = do
+            extend _ m (Left (Statement _ f' _)) = do
                 --pick a hypothesis
-                (Statement n f _, context) <- oneOf $ eachUndeletedHypothesisWithContext hs
+                (Statement _n f _, _context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
                 -- Try to match hypothesis and target
                 oneOf . maybeToList $ extendMatch m (f' / boundVariablesInFormula f' ++ bulletedVars) f
 
-            extend hs m (Right tableau's) = do
+            extend _hs m (Right tableau's) = do
                 --pick a disjunct
                 (Tableau _ _ h's (Target p's)) <- oneOf tableau's
 
@@ -362,7 +360,7 @@ automaticRewriteHypothesis :: MoveType
 automaticRewriteHypothesis = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs t) = do
+    onTableau _ s (Tableau tID tVs hs t) = do
         --pick a hypothesis
         (Statement n f _, context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
@@ -380,7 +378,7 @@ automaticRewriteTarget :: MoveType
 automaticRewriteTarget = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         --pick a target
         (Left (Statement n f _), context) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -406,7 +404,7 @@ rewriteEquality :: (Formula -> [(Variable,Term)]) -> MoveType
 rewriteEquality extract = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         --pick a hypothesis
         (h@(Statement n f _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
@@ -416,9 +414,9 @@ rewriteEquality extract = tableauwise onTableau  where
         guard $ v `notElem` allVariablesInTerm t
 
         let rewriteStatement :: StatementType -> Statement -> RobotM Statement
-            rewriteStatement st s@(Statement n' f' tags) =
+            rewriteStatement st s'@(Statement _ f' _tags) =
               let rewritten = rewrite t v f' in
-                  if f' == rewritten then return s
+                  if f' == rewritten then return s'
                                      else createStatement st rewritten
 
         let rewriteTableau :: Tableau -> RobotM Tableau
@@ -429,8 +427,8 @@ rewriteEquality extract = tableauwise onTableau  where
 
         hs' <- mapM (rewriteStatement STHypothesis) $ context []
         --remove any duplicates of old hypotheses
-        let oldFormulae = [f | Statement _ f _ <- hs]
-            hs'' = [h | h@(Statement _ f _) <- hs', h `elem` hs || f `notElem` oldFormulae]
+        let oldFormulae = [f' | Statement _ f' _ <- hs]
+            hs'' = [h' | h'@(Statement _ f' _) <- hs', h' `elem` hs || f' `notElem` oldFormulae]
 
         let rewrittenHs = hs'' \\ hs
         guard . not $ null rewrittenHs
@@ -444,7 +442,7 @@ rewriteEquality extract = tableauwise onTableau  where
 
     onTableau _ _ _ = mzero
 
-
+rewriteVariableTermEquality :: MoveType
 rewriteVariableTermEquality = rewriteEquality extract where
     extract :: Formula -> [(Variable,Term)]
     extract (AtomicFormula (Predicate "equals") [vt@(VariableTerm v), v't@(VariableTerm v')]) = [(v,v't), (v',vt)]
@@ -452,6 +450,7 @@ rewriteVariableTermEquality = rewriteEquality extract where
     extract (AtomicFormula (Predicate "equals") [t, VariableTerm v]) = [(v,t)]
     extract _ = []
 
+rewriteVariableVariableEquality :: MoveType
 rewriteVariableVariableEquality = rewriteEquality extract where
     extract (AtomicFormula (Predicate "equals") [vt@(VariableTerm v), v't@(VariableTerm v')]) = [(v,v't), (v',vt)]
     extract _ = []

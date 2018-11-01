@@ -14,7 +14,7 @@ module Match (
 ) where
 
 
-import Prelude hiding ((/))
+import Prelude hiding ((/), pred, id)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Map (Map)
@@ -30,9 +30,14 @@ import RobotM
 type Matching = Map Variable Term
 
 type MatchingM = State (Maybe Matching)
+
+emptyMatching :: Map k a
 emptyMatching = Map.empty
+getMatching :: Monad m => StateT s m s
 getMatching = get
+putMatching :: Monad m => s -> StateT s m ()
 putMatching = put
+modifyMatching :: Monad m => (s -> s) -> StateT s m ()
 modifyMatching = modify
 
 execMatching :: Matching -> MatchingM () -> Maybe Matching
@@ -49,24 +54,24 @@ extendMatch matching (FormulaWithSlots f renamable) f' = execMatching matching $
     onFormula :: Formula -> Formula -> MatchingM ()
     onFormula (AtomicFormula pred args) (AtomicFormula pred' args')
         | pred == pred' = zipWithM_ onTerm args args'
-    onFormula (Not f) (Not f') = onFormula f f'
+    onFormula (Not g) (Not g') = onFormula g g'
     onFormula (And fs) (And f's)
         | length fs == length f's = zipWithM_ onFormula fs f's
     onFormula (Or fs) (Or f's)
         | length fs == length f's = zipWithM_ onFormula fs f's
-    onFormula (Forall vs f) (Forall v's f')
+    onFormula (Forall vs g) (Forall v's g')
         | length vs == length v's  =
             sequence_ $ zipWith variableWithTerm vs (map VariableTerm v's) ++
-                        [onFormula f f']
+                        [onFormula g g']
     onFormula (UniversalImplies vs ls r) (UniversalImplies v's l's r')
         | length vs == length v's && length ls == length l's =
             sequence_ $ zipWith variableWithTerm vs (map VariableTerm v's) ++
                         zipWith onFormula ls l's ++
                         [onFormula r r']
-    onFormula (Exists vs f) (Exists v's f')
+    onFormula (Exists vs g) (Exists v's g')
         | length vs == length v's  =
             sequence_ $ zipWith variableWithTerm vs (map VariableTerm v's) ++
-                        [onFormula f f']
+                        [onFormula g g']
     onFormula _ _ = put Nothing
 
     onTerm :: Term -> Term -> MatchingM ()
@@ -81,9 +86,9 @@ extendMatch matching (FormulaWithSlots f renamable) f' = execMatching matching $
             mMatching <- getMatching
             case mMatching of
                 Nothing -> return ()
-                Just matching -> case Map.lookup v matching of
+                Just matching' -> case Map.lookup v matching' of
                     Just t' -> unless (t == t') $ put Nothing
-                    Nothing -> put . Just $ Map.insert v t matching
+                    Nothing -> put . Just $ Map.insert v t matching'
     variableWithTerm v (VariableTerm v')
         | v == v' = return ()
     variableWithTerm _ _ = put Nothing
@@ -94,7 +99,7 @@ matchTerm t renamable t' = execMatching emptyMatching $ onTerm t t' where
     onTerm :: Term -> Term -> MatchingM ()
     onTerm (ApplyFn fn args) (ApplyFn fn' args')
         | fn == fn' && length args == length args' = zipWithM_ onTerm args args'
-    onTerm (VariableTerm v) t = variableWithTerm v t
+    onTerm (VariableTerm v) t'' = variableWithTerm v t''
     onTerm _ _ = put Nothing
 
     variableWithTerm :: Variable -> Term -> MatchingM ()
@@ -206,12 +211,12 @@ twoWayMatchExists (FormulaWithSlots f vs) (FormulaWithSlots f' v's) =
           | renamable v' = areSolvable $ eliminate v' vt  <$> es
           | otherwise = False
 
-      areSolvable (vt@(VariableTerm v) :=: t' : es)
+      areSolvable (VariableTerm v :=: t' : es)
           | v `occursIn` t' = False   --can't match e.g. x and f(x)
           | renamable v = areSolvable $ eliminate v t' <$> es
           | otherwise = False
 
-      areSolvable (t :=: vt'@(VariableTerm v') : es)
+      areSolvable (t :=: VariableTerm v' : es)
           | v' `occursIn` t = False   --can't match e.g. x and f(x)
           | renamable v' = areSolvable $ eliminate v' t <$> es
           | otherwise = False
@@ -260,7 +265,7 @@ matchFormulaeAmongStatements vs = go emptyMatching [] where
     go :: Matching -> [StatementName] -> [Formula] -> [Statement] -> RobotM (Matching, [StatementName])
     go m ns (f:fs) ss = do
         --pick a given statement
-        (Statement n f' _, context) <- oneOf $ eachElementWithContext ss
+        (Statement n f' _, _) <- oneOf $ eachElementWithContext ss
 
         --try to match it with the first given formula
         m' <- oneOf . maybeToList $ extendMatch m (f / boundVariablesInFormula f ++ vs) f'
@@ -279,7 +284,7 @@ matchFormulaeAmongFormulae vs = go emptyMatching where
     go :: Matching -> [Formula] -> [Formula] -> RobotM Matching
     go m (f:fs) f's = do
         --pick one of the f's
-        (f', context) <- oneOf $ eachElementWithContext f's
+        (f', _) <- oneOf $ eachElementWithContext f's
 
         --try to match it with the first lhs formula
         m' <- oneOf . maybeToList $ extendMatch m (f / boundVariablesInFormula f ++ vs) f'
@@ -312,8 +317,8 @@ extendMatchAllButOneOfFormulaeAmongStatements :: Matching -> [Variable] -> [Form
 extendMatchAllButOneOfFormulaeAmongStatements m vs = go m [] Nothing where
 
     go :: Matching -> [StatementName] -> Maybe Formula -> [Formula] -> [Statement] -> RobotM (Matching, [StatementName], Formula)
-    go m ns Nothing [] _ = error "matchAllButOneOfFormulaeAmongStatements called with no formulae."
-    go m ns Nothing [f] _ = return (m,ns,f)
+    go _ _ Nothing [] _ = error "matchAllButOneOfFormulaeAmongStatements called with no formulae."
+    go m' ns Nothing [f] _ = return (m',ns,f)
     go m ns mLeftoverF (f:fs) ss = do
         --pick a given statement
         (Statement n f' _, context) <- oneOf $ eachElementWithContext ss

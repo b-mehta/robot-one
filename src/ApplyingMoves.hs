@@ -21,14 +21,12 @@ import Data.Maybe
 import Data.Either
 import Data.List
 import qualified Data.Map as Map
-import Data.Map (Map, (!))
-import Debug.Trace
+import Data.Map ((!))
 
 import Types
 import Move
 import Match
 import Expansion
-import TexBase
 import Tex
 import RobotM
 import Library
@@ -38,6 +36,7 @@ import Writeup
 
 ----------------------------------------------------------------------------------------------------
 
+boundVars :: Formula -> [Variable]
 boundVars =  boundVariablesInFormula
 
 ----------------------------------------------------------------------------------------------------
@@ -47,16 +46,16 @@ boundVars =  boundVariablesInFormula
 peelHypothesis :: Formula -> ([Formula], [Variable])
 peelHypothesis f@(AtomicFormula _ _) = ([f], [])
 peelHypothesis f@(Not _) = ([f], [])
-peelHypothesis f@(And fs) = concat *** concat $ unzip (peelHypothesis <$> fs)
+peelHypothesis   (And fs) = concat *** concat $ unzip (peelHypothesis <$> fs)
 peelHypothesis f@(Or _) = ([f], [])
 peelHypothesis f@(Forall _ _) = ([f], [])
 peelHypothesis f@(UniversalImplies _ _ _) = ([f], [])
-peelHypothesis f@(Exists vs f') = second (++ vs) $ peelHypothesis f'
+peelHypothesis  (Exists vs f') = second (++ vs) $ peelHypothesis f'
 
 ----------------------------------------------------------------------------------------------------
 
 isExistential :: Formula -> Bool
-isExistential f@(Exists _ _) = True
+isExistential (Exists _ _) = True
 isExistential _ = False
 
 isUniversal ::  Formula -> Bool
@@ -69,7 +68,7 @@ expandPreUniversalTarget = tableauwise onTableau where
 
     {- TODO: make this affect more cases with more than one target?-}
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left (Statement n f _)])) = do
+    onTableau _ s (Tableau tID tVs hs (Target [Left (Statement n f _)])) = do
         --obtain the primary expansion of the target (if one exists)
         expansion <- primaryExpansion f
 
@@ -86,7 +85,7 @@ expandPreExistentialTarget :: MoveType
 expandPreExistentialTarget = tableauwise onTableau where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         --pick a target
         (Left (Statement n f _), context) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -108,7 +107,7 @@ expandPreExistentialHypothesis :: MoveType
 expandPreExistentialHypothesis = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs t) = do
+    onTableau _ s (Tableau tID tVs hs t) = do
         --pick a hypothesis
         (h@(Statement n f _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
@@ -139,7 +138,7 @@ elementaryExpansionOfHypothesis :: MoveType
 elementaryExpansionOfHypothesis = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs t) = do
+    onTableau _ s (Tableau tID tVs hs t) = do
         --pick a hypothesis
         (h@(Statement n f _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
@@ -159,7 +158,7 @@ elementaryExpansionOfTarget :: MoveType
 elementaryExpansionOfTarget = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tN@(TableauName isUnlocked _) tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tN@(TableauName isUnlocked' _) tVs hs (Target ps)) = do
         --pick a target
         (Left t@(Statement n f _), context) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -171,8 +170,8 @@ elementaryExpansionOfTarget = tableauwise onTableau  where
 
         newTargetStatements <- mapM (createStatement STTarget) (partsOfElementary expansion) :: RobotM [Statement]
 
-        let proofClauses = if isUnlocked then [But $ [t] `Iff` newTargetStatements]
-                                         else [TargetIsIE [t] newTargetStatements]
+        let proofClauses = if isUnlocked' then [But $ [t] `Iff` newTargetStatements]
+                                          else [TargetIsIE [t] newTargetStatements]
 
         return (MoveDescription [n] proofClauses $ "Quantifier-free expansion of target " ++ texSN n ++ ".",
                     s . Tableau tN tVs hs . Target . context $ Left <$> newTargetStatements)
@@ -192,7 +191,7 @@ elementaryExpansionOfTarget = tableauwise onTableau  where
 heartAndVariables :: Formula -> (Formula, [Variable], [Variable])
 heartAndVariables f@(AtomicFormula _ _) = (f,[],[])
 heartAndVariables f@(Not _) = (f,[],[])
-heartAndVariables f@(And fs) = (f,[],[])
+heartAndVariables f@(And _) = (f,[],[])
 heartAndVariables f@(Or _) = (f,[],[])
 heartAndVariables (Forall vs f') = (g,us++vs,es) where (g,us,es) = heartAndVariables f'
 heartAndVariables f@(UniversalImplies _ _ _) = (f,[],[])
@@ -230,7 +229,7 @@ forwardsReasoning :: MoveType
 forwardsReasoning = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tN tVs hs t) = do
+    onTableau inheritedHs s (Tableau tN tVs hs t) = do
         -- Find a (possibly inherited) hypothesis with an implicative heart (possibly using expansion)
         --   also obtain any variables lying outside the heart
         (h@(Statement n f tags), context) <- oneOf $ eachUndeletedHypothesisWithContext hs ++
@@ -312,7 +311,7 @@ forwardsLibraryReasoning = tableauwise onTableau  where
         (partsFormulae, vs') <- oneOf . maybeToList $ peelAndFilterNotIn [g | (Statement _ g _) <- hs] newH
         parts <- mapM (createStatement STHypothesis) $ markDependencies <$> partsFormulae :: RobotM [Statement]
 
-        
+
         let newTerms = concatMap (accumulateTermInFormula return) [f | Statement _ f _ <- parts] :: [Term]
         let globalTerms = accumulateTermInTableau return $ s tableau :: [Term]
 
@@ -331,10 +330,10 @@ backwardsReasoning :: MoveType
 backwardsReasoning = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tN tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tN tVs hs (Target ps)) = do
         -- Find a (possibly inherited) hypothesis with an implicative heart (possibly using expansion)
         --   also obtain any variables lying outside the heart
-        (h@(Statement n f tags), context) <- oneOf $ eachUndeletedHypothesisWithContext hs ++
+        (h@(Statement n f _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs ++
                                                   [(h', const hs) | h' <- inheritedHs]
         guard $ hasNoDiamondedVariables h
 --        (UniversalImplies vs as c, uvs, evs) <-
@@ -394,7 +393,7 @@ backwardsLibraryReasoning :: MoveType
 backwardsLibraryReasoning = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tN tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tN tVs hs (Target ps)) = do
         -- Take a library result
         Result desc as c <- askLibraryResult
         let vs = concatMap allDirectVariablesInFormula as
@@ -449,7 +448,7 @@ solveBullets :: MoveType
 solveBullets = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau _inheritedHs s (Tableau tID tVs hs (Target ps)) = do
         let bulletedVars = filter isBulletedOrDiamonded tVs -- [v | v@(Variable _ _ _ VTBullet _) <- tVs]
             varsInHypotheses = nub . sort $ concatMap allVariablesInFormula [f | Statement _ f _ <- hs]
             bulletedVarsBelowLine = bulletedVars \\ varsInHypotheses

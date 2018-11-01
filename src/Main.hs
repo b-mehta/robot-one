@@ -2,35 +2,20 @@ module Main (
     main
 ) where
 
-import Prelude hiding ((/))
+import Prelude hiding ((/), max)
 
-import Control.Arrow
 import Control.Monad
-import Control.Applicative
 import Data.Maybe
-import Data.Either
-import qualified Data.Map as Map
-import Data.Map (Map)
-import Data.List
-import Control.Monad.Logic
-import Control.Monad.Trans.List
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.Identity hiding (msum)
 
 import Debug.Trace
 
 import Types
-import Rename
-import Expansion
-import Match
 import TexBase
 import Move
 import Parser
 import Tex
 import RobotM
-import Library
 import Writeup
-import Printing
 
 import DeletionMoves
 import TidyingMoves
@@ -91,8 +76,10 @@ lengthAtLeast n (_:xs) = lengthAtLeast (n-1) xs
 
 ----------------------------------------------------------------------------------------------------
 
+printMax :: Int
 printMax = 100
 
+main :: IO ()
 main = do
     let pd = TestData.printingData
         lib = TestData.library

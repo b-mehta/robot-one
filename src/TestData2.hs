@@ -5,20 +5,15 @@ module TestData2 (
 import Prelude hiding ((/))
 
 import Control.Arrow
-import Control.Applicative
 import qualified Data.Map as Map
 import Data.Map (Map)
 
 import Types
-import Expansion
-import TexBase
 import Parser
-import Tex
-import RobotM
 import Library
-import Writeup
 import Printing
 
+union3OpenSets :: Problem
 union3OpenSets = Problem
     "If $A$, $B$,and $C$ are open sets, then $A \\cup (B \\cup C)$ is also open." --"The union of three open sets is open."
    ["open(A)",
@@ -26,6 +21,7 @@ union3OpenSets = Problem
     "open(C)"]
     "open(union(A,union(B,C)))"
 
+intersection3OpenSets :: Problem
 intersection3OpenSets = Problem
     "If $A$, $B$,and $C$ are open sets, then $A \\cap (B \\cap C)$ is also open." --"The intersection of three open sets is open."
    ["open(A)",
@@ -33,77 +29,91 @@ intersection3OpenSets = Problem
     "open(C)"]
     "open(intersect(A,intersect(B,C)))"
 
+unionOpenSets :: Problem
 unionOpenSets = Problem
     "If $A$ and $B$ are open sets, then $A \\cup B$ is also open." --"The union of two open sets is open."
    ["open(A)",
     "open(B)"]
     "open(union(A,B))"
 
+intersectionOpenSets :: Problem
 intersectionOpenSets = Problem
     "If $A$ and $B$ are open sets, then $A \\cap B$ is also open." --"The intersection of two open sets is open."
    ["open(A)",
     "open(B)"]
     "open(intersect(A,B))"
 
+unionClosedSets :: Problem
 unionClosedSets = Problem
     "If $A$ and $B$ are closed sets, then $A \\cup B$ is also closed." --"The union of two closed sets is closed."
    ["closed(A)",
     "closed(B)"]
     "closed(union(A,B))"
 
+intersectionClosedSets :: Problem
 intersectionClosedSets = Problem
     "If $A$ and $B$ are closed sets, then $A \\cap B$ is also closed." --"The intersection of two closed sets is closed."
    ["closed(A)",
     "closed(B)"]
     "closed(intersect(A,B))"
 
+continuousPreimageClosed :: Problem
 continuousPreimageClosed = Problem
     "The pre-image of a closed set $U$ under a continuous function $f$ is closed."
    ["continuous(f)",
     "closed(U)"]
     "closed(preimage(f,U))"
 
+continuousPreimageOpen :: Problem
 continuousPreimageOpen = Problem
     "The pre-image of an open set $U$ under a continuous function $f$ is open."
    ["continuous(f)",
     "open(U)"]
     "open(preimage(f,U))"
 
+compositionContinuousFunctions :: Problem
 compositionContinuousFunctions = Problem
     "If $f$ and $g$ are continuous functions, then $g \\circ f$ is continuous." --"A composition of continuous functions is continuous."
    ["continuous(f)",
     "continuous(g)"]
     "continuous(compose(g,f))"
 
+continuousFunctionsPreserveLimits :: Problem
 continuousFunctionsPreserveLimits = Problem
     "If $f$ is a continuous function and $(a_n) \\to a$, then $(f(a_n)) \\to f(a)$"-- "A continuous function preserves limits."
    ["continuous(f)",
     "tendsto(an,a)"]
     "tendsto(applyfnpointwise(f,an),applyfn(f,a))"
 
+closedSubsetCompleteIsComplete :: Problem
 closedSubsetCompleteIsComplete = Problem
     "A closed subset $A$ of a complete metric space $X$ is complete."
    ["completespace(X)",
     "closedin(A,X)"]
     "complete(A)"
 
+ffminusoneAsubsetA :: Problem
 ffminusoneAsubsetA = Problem "$f(f^{-1}(A))\\subset A$"  [] "subsetof(image(f,preimage(f,A)),A)"
 
+asubsetfminusonefA :: Problem
 asubsetfminusonefA = Problem "$A \\subset f^{-1}(f(A))$" [] "subsetof(A, preimage(f,image(f,A)))"
 
 
+iffInjectionThenfAcapfBsubsetfAcapB :: Problem
 iffInjectionThenfAcapfBsubsetfAcapB = Problem
     "If $f$ is an injection then $f(A)\\cap f(B)\\subset f(A\\cap B)$"
         ["injection(f)"]
         "subsetof(intersect(image(f,A),image(f,B)),image(f,intersect(A,B)))"
 
+problems :: [Problem]
 problems = [union3OpenSets,
             intersection3OpenSets,
             unionOpenSets,
             unionClosedSets,
             intersectionClosedSets,
             continuousPreimageClosed]
-            
+
+problems' :: [Problem]
 problems' = [intersectionOpenSets,
             continuousPreimageOpen,
             compositionContinuousFunctions,
@@ -151,6 +161,7 @@ expansionTable = [(f / allVariablesInFormula f, f') |
 --     of the rewrite table.
 --  (This is only relevant if we introduce sets, etc., so that formulae can be inside terms.)
 
+rewriteTableSource :: [(String, String)]
 rewriteTableSource = [
     ("applyfn(compose(f,g),x)", "applyfn(f,applyfn(g,x))"),
     ("kthterm(applyfnpointwise(f,an),n)", "applyfn(f,kthterm(an,n))")
@@ -220,8 +231,10 @@ adjectivePatterns' = Map.fromList [
     ("cauchy", "Cauchy")
   ]
 
+printingData :: PrintingData
 printingData = PrintingData termPatterns' formulaPatterns' nounPatterns' adjectivePatterns'
 
+library :: Library
 library = Library [
     Result "transitivity" [
         parse formula "lessthan(alpha,beta)",

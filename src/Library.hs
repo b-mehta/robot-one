@@ -2,8 +2,8 @@ module Library (
     Library(..),
     Result(..),
     Solution(..),
-    ExpansionTable(..),
-    RewriteTable(..)
+    ExpansionTable,
+    RewriteTable
 ) where
 
 import Types

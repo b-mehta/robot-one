@@ -7,35 +7,30 @@ module DeletionMoves (
 ) where
 
 import Prelude hiding ((/))
-import Control.Arrow
 import Control.Monad
 import Control.Applicative
 import Data.Maybe
-import Data.Either
 import Data.List
-import qualified Data.Map as Map
-import Data.Map (Map, (!))
+import Data.Map ((!))
 
 import Types
 import Move
 import Match
 import Expansion
-import TexBase
 import Tex
 import RobotM
 
-import Debug.Trace
-
 ----------------------------------------------------------------------------------------------------
 
+boundVars :: Formula -> [Variable]
 boundVars =  boundVariablesInFormula
 
 ----------------------------------------------------------------------------------------------------
 
 replaceTargetStatementWithTableau :: StatementName -> Tableau -> Tableau -> Tableau
 replaceTargetStatementWithTableau n rep = mapTableau shallow where
-    shallow tableau@(Tableau tID tVs hs t@(Target ps)) =
-        case [c | (Left t@(Statement n' _ _), c) <- eachUndeletedTargetPartWithContext ps, n == n'] of
+    shallow tableau@(Tableau tID tVs hs (Target ps)) =
+        case [c | (Left (Statement n' _ _), c) <- eachUndeletedTargetPartWithContext ps, n == n'] of
             [context] -> Tableau tID tVs hs . Target $ context [Right [rep]]
             [] -> tableau
     shallow tableau = tableau
@@ -60,7 +55,7 @@ deleteDone :: MoveType
 deleteDone = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
         guard $ any isSingleDoneTP ps --some target part consists of a single 'Done'
 
         let notDone = filter (not . isSingleDoneTP) ps
@@ -70,9 +65,9 @@ deleteDone = tableauwise onTableau  where
                     "All targets of " ++ texTN tID ++ " are `Done', so " ++ texTN tID ++ " is itself done.",
                 s $ Done tID)
 
-            ps -> return (MoveDescription [] [] $
+            ps' -> return (MoveDescription [] [] $
                     "Remove `Done' targets of " ++ texTN tID ++ ".",
-                s . Tableau tID tVs hs . Target $ ps)
+                s . Tableau tID tVs hs . Target $ ps')
 
     onTableau _ _ _ = mzero
 
@@ -80,7 +75,7 @@ deleteDoneDisjunct :: MoveType
 deleteDoneDisjunct = tableauwise onTableau  where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target ps)) = do
+    onTableau _ s (Tableau tID tVs hs (Target ps)) = do
 
         (Right ts, targetContext) <- oneOf $ eachUndeletedTargetPartWithContext ps
 
@@ -91,9 +86,9 @@ deleteDoneDisjunct = tableauwise onTableau  where
                     "Some disjunct of the target of " ++ texTN tID ++ " is `Done', so " ++ texTN tID ++ " is itself `Done'.",
                 s $ Done tID)
 
-            ps -> return (MoveDescription [] [] $
+            ps' -> return (MoveDescription [] [] $
                     "Some disjunct of a target line of " ++ texTN tID ++ " is `Done', so we will remove the line.",
-                s . Tableau tID tVs hs . Target $ ps)
+                s . Tableau tID tVs hs . Target $ ps')
 
 
     onTableau _ _ _ = mzero
@@ -117,13 +112,13 @@ removeExistentialQuantifiers f@(And _) = f
 removeExistentialQuantifiers f@(Or _) = f
 removeExistentialQuantifiers f@(Forall _ _) = f
 removeExistentialQuantifiers f@(UniversalImplies _ _ _) = f
-removeExistentialQuantifiers f@(Exists vs f') = removeExistentialQuantifiers f'
+removeExistentialQuantifiers   (Exists _ f') = removeExistentialQuantifiers f'
 
 tagRedundantForwardsImplication :: MoveType
 tagRedundantForwardsImplication = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t) = do
+    onTableau _inheritedHs s (Tableau tID tVs hs t) = do
         -- Find a one-variable implicative hypothesis (possibly using expansion)
         (Statement n f tags, context) <- oneOf $ eachElementWithContext hs
         UniversalImplies vs [_] consequent <- return f <|> speculative (primaryExpansion f)
@@ -161,11 +156,11 @@ tagRedundantBackwardsImplication :: MoveType
 tagRedundantBackwardsImplication = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target [Left (Statement n' f' _)])) = do
+    onTableau _inheritedHs s (Tableau tID tVs hs t@(Target [Left (Statement n' f' _)])) = do
         -- Find a one-variable implicative hypothesis (possibly using expansion)
         (Statement n f tags, context) <- oneOf $ eachElementWithContext hs
-        UniversalImplies vs [antecedent] consequent <- return f <|> speculative (primaryExpansion f)
-        let otherHs = context []
+        UniversalImplies vs [antecedent] _consequent <- return f <|> speculative (primaryExpansion f)
+        let _otherHs = context []
 
         -- Try to match the antecedent of the hypothesis with the target
         matching <- oneOf . maybeToList $ match (antecedent / vs ++ boundVars antecedent) f'
@@ -223,7 +218,7 @@ deleteDangling :: MoveType
 deleteDangling = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target _)) = do
 
         let visibleHypotheses = filter undeleted $ inheritedHs ++ hypothesesAtAnyDepth tableau
             visibleTargets = filter undeleted $ targetFormulaeAtAnyDepth tableau
@@ -233,12 +228,12 @@ deleteDangling = tableauwise onTableau  where
         guard $ Vulnerable `elem` tags
 
         --Pick a (unbound, unbulleted) variable v used in h
-        v@(Variable _ _ vType VTNormal _) <- oneOf $ allVariablesInFormula f \\ boundVariablesInFormula f
+        v@(Variable _ _ _vType VTNormal _) <- oneOf $ allVariablesInFormula f \\ boundVariablesInFormula f
 
         --Find all statements which meantion or could potentially use v
         let statementsWantingV = nub . sort $
               -- statements mentioning v [NB. mentions of v inside dependencies don't count -- hence use of allDirectVariablesInFormula.]
-              [s | s@(Statement _ f' _) <- visibleHypotheses ++ visibleTargets, v `elem` allDirectVariablesInFormula f'] -- ++
+              [s' | s'@(Statement _ f' _) <- visibleHypotheses ++ visibleTargets, v `elem` allDirectVariablesInFormula f'] -- ++
 --   --The following rule doesn't quite seem right; we have commented it out for now.
 --              -- statements which are neither unexpandable nor simple-conditional
 --              [s | s@(Statement _ f' _) <- visibleHypotheses ++ visibleTargets, not (isUnexpandable f' || isSimpleConditional f')] ++
@@ -305,7 +300,7 @@ matchesPremiseOfM = do
             -- Choose an antecedent
             a <- oneOf as
             -- Try to match
-            m <- oneOf . maybeToList $ match (a / v's ++ boundVars a) f
+            _m <- oneOf . maybeToList $ match (a / v's ++ boundVars a) f
 
             return ()
 
@@ -322,9 +317,9 @@ matchesPremiseOf'M = do
     robotState <- getRobotState
     let --tryMatchM nondeterministically tries to find a match, and returns () if it succeeds
         tryMatchM :: FormulaWithSlots -> Statement -> RobotM ()
-        tryMatchM (FormulaWithSlots f vs) (Statement _ f' tags') = do
+        tryMatchM (FormulaWithSlots f vs) (Statement _ f' _tags') = do
             -- Possibly expand f' + look for a universal implication
-            UniversalImplies v's as _ <- return f' <|> primaryExpansion f'
+            UniversalImplies _v's as _ <- return f' <|> primaryExpansion f'
             -- Choose an antecedent
             a <- oneOf as
             -- Try to match
@@ -345,9 +340,9 @@ matchesConclusionOf'M = do
     robotState <- getRobotState
     let --tryMatchM nondeterministically tries to find a match, and returns () if it succeeds
         tryMatchM :: FormulaWithSlots -> Statement -> RobotM ()
-        tryMatchM (FormulaWithSlots f vs) (Statement _ f' tags') = do
+        tryMatchM (FormulaWithSlots f vs) (Statement _ f' _tags') = do
             -- Possibly expand f' + look for a universal implication
-            UniversalImplies v's _ c <- return f' <|> primaryExpansion f'
+            UniversalImplies _v's _ c <- return f' <|> primaryExpansion f'
             -- Try to match
             guard $ twoWayMatchExists (f / vs ++ boundVars f) (c / boundVars c)
 
@@ -430,7 +425,7 @@ deleteUnmatchableAtomicHypothesis :: MoveType
 deleteUnmatchableAtomicHypothesis = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target _)) = do
 
         let visibleHypotheses = filter undeleted $ inheritedHs ++ hypothesesAtAnyDepth tableau
             visibleTargets = filter undeleted $ targetFormulaeAtAnyDepth tableau
@@ -466,7 +461,7 @@ deleteHypothesisWithUnmatchablePremise :: MoveType
 deleteHypothesisWithUnmatchablePremise = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target _)) = do
 
         let visibleHypotheses = filter undeleted $ inheritedHs ++ hypothesesAtAnyDepth tableau
             visibleTargets = filter undeleted $ targetFormulaeAtAnyDepth tableau
@@ -486,7 +481,7 @@ deleteHypothesisWithUnmatchablePremise = tableauwise onTableau  where
         matchesPremiseOf' <- matchesPremiseOf'M
         matchesConclusionOf' <- matchesConclusionOf'M
 
-        let actualMatches = filter ((a/vs) `matches`) [h | h@(Statement _ g _) <- visibleHypotheses, isAtomic g] ++
+        let actualMatches = filter ((a/vs) `matches`) [h' | h'@(Statement _ g _) <- visibleHypotheses, isAtomic g] ++
                             filter ((a/vs) `matchesConclusionOf'`) visibleHypotheses ++
                             filter ((a/vs) `matchesPremiseOf'`) visibleTargets
 
@@ -513,7 +508,7 @@ deleteHypothesisWithUnmatchableConclusion :: MoveType
 deleteHypothesisWithUnmatchableConclusion = tableauwise onTableau  where
 
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target ps)) = do
+    onTableau inheritedHs s tableau@(Tableau tID tVs hs t@(Target _)) = do
 
         let visibleHypotheses = filter undeleted $ inheritedHs ++ hypothesesAtAnyDepth tableau
             visibleTargets = filter undeleted $ targetFormulaeAtAnyDepth tableau

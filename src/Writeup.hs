@@ -3,25 +3,12 @@
 module Writeup
   where
 
-
-import Control.Applicative
---import Control.Arrow
-----import Control.Monad.RWS hiding (msum)
---import Control.Monad.Logic hiding (msum)
---import Control.Monad.Trans.List
---import Control.Monad.Trans.State.Lazy
---import Control.Monad.Identity hiding (msum)
+import Prelude hiding (id, pred)
 import Control.Monad
---import Data.Either
 import Data.List
-import Data.Maybe
---import Data.Map hiding (map, filter, null)
---import Data.Foldable (msum)
 import Data.Char
-import Data.Map (Map, (!))
+import Data.Map ((!))
 import qualified Data.Map as Map
-
-import Debug.Trace
 
 import Printing
 import Types
@@ -61,14 +48,14 @@ writeupID :: ID -> String
 writeupID n = replicate (n-1) '\''
 
 instance Writeup Variable where
-    writeup pd (Variable s id t hasBullet d) = tex pd . Variable s id t VTNormal $ Dependencies [] []
+    writeup pd (Variable s id t _ _) = tex pd . Variable s id t VTNormal $ Dependencies [] []
 
 writeupIntro :: PrintingData -> Variable -> String
 writeupIntro pd v@(Variable _ _ TPositiveRealNumber _ _) = writeup pd v ++ " > 0"
 writeupIntro pd v = writeup pd v
 
 writeupSequenceShort :: PrintingData -> Term -> String
-writeupSequenceShort pd (VariableTerm (Variable "an" id _ _ _)) = "a_n" ++ writeupID id
+writeupSequenceShort _  (VariableTerm (Variable "an" id _ _ _)) = "a_n" ++ writeupID id
 writeupSequenceShort pd t = writeup pd t
 
 writeupSequenceElement :: Variable -> String -> String
@@ -119,7 +106,7 @@ instance Writeup VariableChoice where
     writeup pd (VariableChoice v t) = math $ writeup pd v ++ " = " ++ writeup pd t
 
 instance Writeup Statement where
-    writeup pd (Statement n f _) = writeup pd f
+    writeup pd (Statement _ f _) = writeup pd f
 
 
 instance Writeup [Formula] where
@@ -189,11 +176,11 @@ isAdjectival pd (AtomicFormula (Predicate name) _) = name `Map.member` adjective
 isAdjectival _  _ = False
 
 writeupNoun :: PrintingData -> Formula -> String
-writeupNoun pd (AtomicFormula (Predicate name) (a:as)) =
+writeupNoun pd (AtomicFormula (Predicate name) (_:as)) =
     instantiatePattern (nounPatterns pd ! name) (writeup pd <$> as)
 
 writeupAdjective :: PrintingData -> Formula -> String
-writeupAdjective pd (AtomicFormula (Predicate name) (a:as)) =
+writeupAdjective pd (AtomicFormula (Predicate name) (_:as)) =
     instantiatePattern (adjectivePatterns pd ! name) (writeup pd <$> as)
 
 ----------------------------------------------------------------------------------------------------
@@ -237,8 +224,8 @@ extractFormulae [Statement _ f _] = f
 extractFormulae ss = And [f | Statement _ f _ <- ss]
 
 instance Writeup Clause where
-    writeup pd (StubClause s) = textbf $ "[" ++ s ++ "]"
-    writeup pd ProofDone = "we are done"
+    writeup _  (StubClause s) = textbf $ "[" ++ s ++ "]"
+    writeup _  ProofDone = "we are done"
     writeup pd (TargetReminder ss) = "[we are trying to " ++ writeupShow pd ss ++ ".]"
     writeup pd (TargetIs ss) = "we would like to " ++ writeupShow pd ss
     writeup pd (TargetIsIE ss s's) = "we would like to show that " ++ writeup pd ss ++ ", i.e. that " ++ writeup pd s's
@@ -266,7 +253,7 @@ instance Writeup Clause where
     writeup pd (ByDefSince ss f cs) = "by definition, since " ++ writeup pd ss ++ ", " ++ (guard f >> "it follows that ") ++ writeup pd cs
     writeup pd (WeKnowThat cs) = "we know " ++ andList (("that " ++) . writeup pd <$> cs)
     writeup pd (But c) = "but " ++ writeup pd c
-    writeup pd ClearlyTheCaseDone = "but this is clearly the case, so we are done"
+    writeup _  ClearlyTheCaseDone = "but this is clearly the case, so we are done"
 
 instance Writeup [Clause] where
     writeup pd cs = andList $ writeup pd <$> cs
@@ -305,7 +292,7 @@ nameElem :: Statement -> [Statement] -> Bool
 nameElem s (s':s's)
     | s === s' = True
     | otherwise = s `nameElem` s's
-nameElem s [] = False
+nameElem _ [] = False
 
 nameNotElem :: Statement -> [Statement] -> Bool
 nameNotElem s = not . nameElem s
@@ -332,7 +319,7 @@ fusePair (Let as) (Let a's) = Just . Let $ as ++ a's
 fusePair (WeKnowThat as) (WeKnowThat a's) = Just . WeKnowThat $ as ++ a's
 fusePair t@(TargetIs ss) (TargetIs s's)
     | ss == s's = Just t
-fusePair t@(TargetIsIE ss s's) (TargetIs s''s)
+fusePair t@(TargetIsIE _ s's) (TargetIs s''s)
     | s's == s''s = Just t
 fusePair _ _ = Nothing
 
@@ -346,23 +333,23 @@ fusePair _ _ = Nothing
 
 --factsDeduced: the facts deduced in a particular step
 factsDeduced :: Clause -> [Statement]
-factsDeduced (StubClause s) = []
+factsDeduced (StubClause _) = []
 factsDeduced ProofDone = []
-factsDeduced (TargetReminder ss) = []
-factsDeduced (TargetIs ss) = []
+factsDeduced (TargetReminder _) = []
+factsDeduced (TargetIs _) = []
 factsDeduced (TargetIsIE _ _) = []
-factsDeduced (Let as) = []
+factsDeduced (Let _) = []
 factsDeduced (Take _) = []
 factsDeduced (Assertion ss) = ss
-factsDeduced (WeMayTake cs) = []
-factsDeduced (ThereforeSettingDone cs) = []
-factsDeduced (If as c) = []
-factsDeduced (Whenever as c) = []
+factsDeduced (WeMayTake _) = []
+factsDeduced (ThereforeSettingDone _) = []
+factsDeduced (If _ _) = []
+factsDeduced (Whenever _ _) = []
 factsDeduced (Iff ss s's) = ss ++ s's
 factsDeduced (AssumeNow ss) = ss
-factsDeduced (ExistVars vs c) = [] --factsDeduced c
-factsDeduced (Since ss f cs) = concatMap factsDeduced cs
-factsDeduced (ByDefSince ss f cs) = concatMap factsDeduced cs
+factsDeduced (ExistVars _ _) = [] --factsDeduced c
+factsDeduced (Since _ _ cs) = concatMap factsDeduced cs
+factsDeduced (ByDefSince _ _ cs) = concatMap factsDeduced cs
 factsDeduced (WeKnowThat cs) = concatMap factsDeduced cs
 factsDeduced (But c) = factsDeduced c
 factsDeduced ClearlyTheCaseDone = []
@@ -401,7 +388,7 @@ convert fs ls as (ByDefSince ss _ cs)
     | any (`nameElem` ls) ss = Unit (Just Then)      [ByDefSince (filter (`nameNotElem` (ls ++ as)) ss) False cs]
     | all (`nameElem` as) ss = Unit (Just AndA) $ cs
     | any (`nameElem` as) ss = Unit (Just AndA) [ByDefSince (filter (`nameNotElem` as) ss) False cs]
-convert fs ls as c = Unit Nothing [c]
+convert _ _ _ c = Unit Nothing [c]
 
 ----------------------------------------------------------------------------------------------------
 
