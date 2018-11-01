@@ -69,13 +69,16 @@ smalltextrm, smalltextit :: String -> String
 smalltextrm = textrm . small
 smalltextit = textit . small
 
+boldmath :: String -> String
 boldmath s = "\\boldmath " ++ s ++ "\\unboldmath "
 
+overline :: String -> String
 overline s = "\\overline{" ++ s ++ "}"
 
 ensuremath :: String -> String
 ensuremath s = "\\ensuremath{" ++ s ++ "}"
 
+texableGreekLetters :: Set.Set String
 texableGreekLetters = Set.fromList
     ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
      "lambda", "mu", "nu", "xi", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi",
@@ -100,6 +103,7 @@ texVerbatim = textbf . escape
 fit :: String -> String
 fit s = "\\begin{fit}" ++ s ++ "\\end{fit}"
 
+texHeader :: String
 texHeader =
     "\\documentclass[a4paper,twoside,12pt]{article}\n\
     \\\usepackage[hmargin={12mm,55mm},vmargin=10mm,footskip=7mm,asymmetric]{geometry}\n\
@@ -154,5 +158,6 @@ texHeader =
     \\\begin{document}\
     \\n"
 
+texFooter :: String
 texFooter = "\n\\end{document}"
 

@@ -18,12 +18,8 @@ import Prelude hiding ((/))
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Map (Map)
-import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans
 import Control.Monad.Trans.State.Lazy
-
-import Debug.Trace
 
 import Types
 import Move
@@ -173,7 +169,7 @@ extractEquations _ _ = Nothing
 
 --TODO: rewrite occursIn using the Any monoid
 occursIn :: Variable -> Term -> Bool
-occursIn v = or . accumulateVariableInTerm (return . (== v))
+occursIn v = or . accumulateVariableInTerm ((:[]) . (== v))
 
 --we don't want the matching algorithm to recurse into dependencies, so we will simply strip them out
 removeDependencies :: Variable -> Variable

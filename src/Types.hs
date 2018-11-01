@@ -311,7 +311,7 @@ mapFormulaInTableau = nonmonadic mapFormulaInTableauM
 
 ----------------------------------------------------------------------------------------------------
 
-accumulate :: forall w. forall a. forall b. (Monoid w) => ((a -> Writer w a) -> b-> Writer w b) -> (a -> w) -> b -> w
+accumulate :: forall w a b. (Monoid w) => ((a -> Writer w a) -> b -> Writer w b) -> (a -> w) -> b -> w
 accumulate mm f = snd . runWriter . mm write
   where write :: a -> Writer w a
         write = liftM2 (>>) (tell . f) return
