@@ -2,7 +2,7 @@
 Module      :Printing
 Stability   :experimental
 
-Patterns for printing TeX
+Patterns for printing TeX.
 -}
 
 module Printing
