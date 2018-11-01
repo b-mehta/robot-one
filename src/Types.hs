@@ -4,16 +4,11 @@
 module Types where
 
 
-import Prelude hiding (repeat, (/))
-import Control.Applicative
+import Prelude hiding (repeat, (/), pred, id)
 import Data.Functor.Identity
 import Control.Monad
 import Control.Monad.Writer.Lazy (Writer, tell, runWriter)
-import Data.Monoid
 import Data.List
-import Debug.Trace
-
-import TexBase
 
 ----------------------------------------------------------------------------------------------------
 
@@ -103,8 +98,8 @@ instance Pretty VariableType where
     pretty VTBullet = "B"
 
 instance Pretty Variable where
-    pretty (Variable s id _ vtype d) =
-        prettyVariableNameID s id ++ pretty vtype ++ pretty d
+    pretty (Variable s id' _ vtype d) =
+        prettyVariableNameID s id' ++ pretty vtype ++ pretty d
 
 
 instance Pretty Term where
@@ -141,7 +136,7 @@ instance Pretty Statement where
     pretty (Statement n f _) = pretty n ++ ". " ++ pretty f
 
 instance Pretty Tableau where
-    pretty (Tableau id vs ss t) = unlines $
+    pretty (Tableau id _ ss t) = unlines $
         [show id] ++
         (pretty <$> ss) ++
         ["--------",
@@ -180,6 +175,7 @@ mapDirectTermInVariableM :: Monad m => (Term -> m Term) -> Variable -> m Variabl
 mapDirectTermInVariableM fn (Variable n id t bs (Dependencies ds is)) =
     Variable n id t bs `liftM` (return Dependencies `ap` mapM fn ds `ap` mapM fn is)
 
+mapTermInVariableM :: Monad m => (Term -> m Term) -> Variable -> m Variable
 mapTermInVariableM = mapDirectTermInVariableM . mapTermM
 
 mapTermM :: Monad m => (Term -> m Term) -> Term -> m Term
@@ -192,6 +188,7 @@ mapDirectVariableInTermM :: Monad m => (Variable -> m Variable) -> Term -> m Ter
 mapDirectVariableInTermM f (VariableTerm v) = VariableTerm `liftM` f v
 mapDirectVariableInTermM f (ApplyFn fn args) = ApplyFn fn `liftM` mapM (mapDirectVariableInTermM f) args
 
+mapVariableInTermM :: Monad m => (Variable -> m Variable) -> Term -> m Term
 mapVariableInTermM = mapDirectVariableInTermM . mapVariableM
 
 
@@ -214,6 +211,7 @@ mapDirectVariableInFormulaM  fn = mapFormulaM immediate where
     immediate (UniversalImplies vs as c) = UniversalImplies `liftM` mapM fn vs `ap` return as `ap` return c
     immediate (Exists vs f) =              Exists           `liftM` mapM fn vs `ap` return f
 
+mapVariableInFormulaM :: Monad m => (Variable -> m Variable) -> Formula -> m Formula
 mapVariableInFormulaM = mapDirectVariableInFormulaM . mapVariableM
 
 --mapDirectTermInFormulaM: drills down through formulae to find terms; does not look inside terms
@@ -261,6 +259,7 @@ mapDirectVariableInTableauM fn (Tableau id vs hs t) =
     inTargetM Contradiction = return Contradiction
 mapDirectVariableInTableauM _ d@(Done _) = return d
 
+mapVariableInTableauM :: Monad m => (Variable -> m Variable) -> Tableau -> m Tableau
 mapVariableInTableauM = mapDirectVariableInTableauM . mapVariableM
 
 mapDirectTermInTableauM :: Monad m => (Term-> m Term) -> Tableau -> m Tableau --deep (affects all terms)
@@ -286,27 +285,46 @@ mapFormulaInTableauM = mapDirectFormulaInTableauM . mapFormulaM
 
 ----------------------------------------------------------------------------------------------------
 
-nonmonadic :: ((a -> Identity a) -> b-> Identity b) -> (a -> a) -> b -> b
+nonmonadic :: ((a -> Identity a) -> b -> Identity b) -> (a -> a) -> b -> b
 nonmonadic mm f = runIdentity . mm (return . f)
 
+mapVariable :: (Variable -> Variable) -> Variable -> Variable
 mapVariable = nonmonadic mapVariableM
+mapTerm :: (Term -> Term) -> Term -> Term
 mapTerm = nonmonadic mapTermM
+mapTermInVariable :: (Term -> Term) -> Variable -> Variable
 mapTermInVariable = nonmonadic mapTermInVariableM
+mapDirectVariableInTerm :: (Variable -> Variable) -> Term -> Term
 mapDirectVariableInTerm = nonmonadic mapDirectVariableInTermM
+mapVariableInTerm :: (Variable -> Variable) -> Term -> Term
 mapVariableInTerm = nonmonadic mapVariableInTermM
 
+
+mapFormula :: (Formula -> Formula) -> Formula -> Formula
 mapFormula = nonmonadic mapFormulaM
+mapDirectVariableInFormula :: (Variable -> Variable) -> Formula -> Formula
 mapDirectVariableInFormula = nonmonadic mapDirectVariableInFormulaM
+mapVariableInFormula :: (Variable -> Variable) -> Formula -> Formula
 mapVariableInFormula = nonmonadic mapVariableInFormulaM
+mapDirectTermInFormula :: (Term -> Term) -> Formula -> Formula
 mapDirectTermInFormula = nonmonadic mapDirectTermInFormulaM
+mapTermInFormula :: (Term -> Term) -> Formula -> Formula
 mapTermInFormula = nonmonadic mapTermInFormulaM
 
+
+mapTableau :: (Tableau -> Tableau) -> Tableau -> Tableau
 mapTableau = nonmonadic mapTableauM
+mapDirectVariableInTableau :: (Variable -> Variable) -> Tableau -> Tableau
 mapDirectVariableInTableau = nonmonadic mapDirectVariableInTableauM
+mapVariableInTableau :: (Variable -> Variable) -> Tableau -> Tableau
 mapVariableInTableau = nonmonadic mapVariableInTableauM
+mapDirectTermInTableau :: (Term -> Term) -> Tableau -> Tableau
 mapDirectTermInTableau = nonmonadic mapDirectTermInTableauM
+mapTermInTableau :: (Term -> Term) -> Tableau -> Tableau
 mapTermInTableau = nonmonadic mapTermInTableauM
+mapDirectFormulaInTableau :: (Formula -> Formula) -> Tableau -> Tableau
 mapDirectFormulaInTableau = nonmonadic mapDirectFormulaInTableauM
+mapFormulaInTableau  :: (Formula -> Formula) -> Tableau -> Tableau
 mapFormulaInTableau = nonmonadic mapFormulaInTableauM
 
 ----------------------------------------------------------------------------------------------------
@@ -316,25 +334,41 @@ accumulate mm f = snd . runWriter . mm write
   where write :: a -> Writer w a
         write = liftM2 (>>) (tell . f) return
 
+accumulateVariable :: Monoid w => (Variable -> w) -> Variable -> w
 accumulateVariable = accumulate mapVariableM
+accumulateTerm :: Monoid w => (Term -> w) -> Term -> w
 accumulateTerm = accumulate mapTermM
+accumulateTermInVariable :: Monoid w => (Term -> w) -> Variable -> w
 accumulateTermInVariable = accumulate mapTermInVariableM
+accumulateDirectVariableInTerm :: Monoid w => (Variable -> w) -> Term -> w
 accumulateDirectVariableInTerm = accumulate mapDirectVariableInTermM
+accumulateVariableInTerm :: Monoid w => (Variable -> w) -> Term -> w
 accumulateVariableInTerm = accumulate mapVariableInTermM
 
+accumulateFormula :: Monoid w => (Formula -> w) -> Formula -> w
 accumulateFormula = accumulate mapFormulaM
+accumulateDirectVariableInFormula :: Monoid w => (Variable -> w) -> Formula -> w
 accumulateDirectVariableInFormula = accumulate mapDirectVariableInFormulaM
+accumulateVariableInFormula :: Monoid w => (Variable -> w) -> Formula -> w
 accumulateVariableInFormula = accumulate mapVariableInFormulaM
+accumulateDirectTermInFormula :: Monoid w => (Term -> w) -> Formula -> w
 accumulateDirectTermInFormula = accumulate mapDirectTermInFormulaM
+accumulateTermInFormula :: Monoid w => (Term -> w) -> Formula -> w
 accumulateTermInFormula = accumulate mapTermInFormulaM
 
 accumulateTableau :: Monoid w => (Tableau -> w) -> Tableau -> w
 accumulateTableau = accumulate mapTableauM
+accumulateDirectVariableInTableau :: Monoid w => (Variable -> w) -> Tableau -> w
 accumulateDirectVariableInTableau = accumulate mapDirectVariableInTableauM
+accumulateVariableInTableau :: Monoid w => (Variable -> w) -> Tableau -> w
 accumulateVariableInTableau = accumulate mapVariableInTableauM
+accumulateDirectTermInTableau :: Monoid w => (Term -> w) -> Tableau -> w
 accumulateDirectTermInTableau = accumulate mapDirectTermInTableauM
+accumulateTermInTableau :: Monoid w => (Term -> w) -> Tableau -> w
 accumulateTermInTableau = accumulate mapTermInTableauM
+accumulateDirectFormulaInTableau :: Monoid w => (Formula -> w) -> Tableau -> w
 accumulateDirectFormulaInTableau = accumulate mapDirectFormulaInTableauM
+accumulateFormulaInTableau :: Monoid w => (Formula -> w) -> Tableau -> w
 accumulateFormulaInTableau = accumulate mapFormulaInTableauM
 
 ----------------------------------------------------------------------------------------------------
@@ -342,7 +376,7 @@ accumulateFormulaInTableau = accumulate mapFormulaInTableauM
 isAtomic :: Formula -> Bool
 isAtomic (AtomicFormula _ _) = True
 isAtomic (Not _) = True
-isAtomic (And fs) = True
+isAtomic (And _) = True
 isAtomic (Or _) = True
 isAtomic (Forall _ _) = False
 isAtomic (UniversalImplies _ _ _) = False
