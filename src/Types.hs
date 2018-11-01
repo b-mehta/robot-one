@@ -233,7 +233,7 @@ mapDirectFormulaInStatementM fn (Statement n f ts) = return (Statement n) `ap` f
 
 
 eitherM :: Monad m => (a -> m a) -> (b -> m b) -> Either a b -> m (Either a b)
-eitherM f g = either (liftM Left . f) (liftM Right . g)
+eitherM f g = either (fmap Left . f) (fmap Right . g)
 
 --mapTableauM : deep (affacts all subtableau of given tableau)
 mapTableauM :: forall m. Monad m => (Tableau -> m Tableau) -> Tableau -> m Tableau
@@ -252,7 +252,7 @@ mapDirectVariableInTableauM fn (Tableau id vs hs t) =
                             `ap` mapM (mapDirectFormulaInStatementM $ mapDirectVariableInFormulaM fn) hs
                             `ap` inTargetM t where
     inTargetM :: Target -> m Target
-    inTargetM (Target ps) = liftM Target (mapM g ps) where
+    inTargetM (Target ps) = fmap Target (mapM g ps) where
         g :: Either Statement [Tableau] -> m (Either Statement [Tableau])
         g = eitherM (mapDirectFormulaInStatementM $ mapDirectVariableInFormulaM fn)
                     (mapM (mapDirectVariableInTableauM fn))
@@ -273,7 +273,7 @@ mapDirectFormulaInTableauM :: forall m. Monad m => (Formula -> m Formula) -> Tab
 mapDirectFormulaInTableauM fn (Tableau id vs hs t) = return (Tableau id vs) `ap` mapM (mapDirectFormulaInStatementM fn) hs
                                                                             `ap` inTargetM t where
     inTargetM :: Target -> m Target
-    inTargetM (Target ps) = Target `liftM` mapM g ps where
+    inTargetM (Target ps) = Target <$> mapM g ps where
         g :: Either Statement [Tableau] -> m (Either Statement [Tableau])
         g = eitherM (mapDirectFormulaInStatementM fn)
                     (mapM $ mapDirectFormulaInTableauM fn)

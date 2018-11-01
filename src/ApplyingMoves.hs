@@ -289,7 +289,7 @@ forwardsLibraryReasoning = tableauwise onTableau  where
             visibleHs = filter hasNoDiamondedVariables . filter undeleted $ hs ++ inheritedHs
 
         -- Try to match the antecedents (a.k.a. premises)
-        (matching, n's) <- matchFormulaeAmongStatements vs as $ visibleHs
+        (matching, n's) <- matchFormulaeAmongStatements vs as visibleHs
         guard $ areDistinct n's
 
         --make sure we have matched all the quantified variables

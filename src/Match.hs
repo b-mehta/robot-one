@@ -321,7 +321,7 @@ extendMatchAllButOneOfFormulaeAmongStatements m vs = go m [] Nothing where
     go m' ns Nothing [f] _ = return (m',ns,f)
     go m ns mLeftoverF (f:fs) ss = do
         --pick a given statement
-        (Statement n f' _, context) <- oneOf $ eachElementWithContext ss
+        (Statement n f' _, _context) <- oneOf $ eachElementWithContext ss
 
         --try to match it with the first given formula
         case extendMatch m (f / boundVariablesInFormula f ++ vs) f' of
@@ -330,7 +330,7 @@ extendMatchAllButOneOfFormulaeAmongStatements m vs = go m [] Nothing where
                 Just _ -> mzero  --two leftover formulae
                 Nothing -> go m ns (Just f) fs ss --first unmatchable formula found
 
-    go m ns (Just l) [] _ = return (m,ns,l)
+    go m' ns (Just l) [] _ = return (m',ns,l)
 
 
 matchSomeOfFormulaeAmongStatements :: [Variable] -> [Formula] -> [Statement] -> RobotM (Matching, [StatementName], [Formula])
@@ -342,7 +342,7 @@ extendMatchSomeOfFormulaeAmongStatements m vs = go m [] [] where
     go :: Matching -> [StatementName] -> [Formula] -> [Formula] -> [Statement] -> RobotM (Matching, [StatementName], [Formula])
     go m ns leftovers (f:fs) ss = do
         --pick a given statement
-        (Statement n f' _, context) <- oneOf $ eachElementWithContext ss
+        (Statement n f' _, _context) <- oneOf $ eachElementWithContext ss
 
         --try to match it with the first given formula
         case extendMatch m (f / boundVariablesInFormula f ++ vs) f' of

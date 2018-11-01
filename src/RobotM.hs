@@ -1,6 +1,6 @@
 module RobotM (
     oneOf,
-    RobotM(..),
+    RobotM,
     askPrintingData,
     askLibrary,
     askLibraryResult, askLibrarySolution, askLibraryExpansionTable, askLibraryRewriteTable,
@@ -12,18 +12,14 @@ module RobotM (
     copyStatement, copyTableau, copyTarget
 ) where
 
-import Control.Applicative
-import Control.Arrow
+import Prelude hiding (id, pred)
 import Control.Monad.Logic hiding (msum)
-import Control.Monad.Trans.List
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Reader
 import Control.Monad.Identity hiding (msum)
-import Data.Either
-import Data.List (nub, sort)
 import Data.Maybe
 import qualified Data.Map as Map
-import Data.Map (Map, (!), member, notMember)
+import Data.Map (Map, (!), notMember)
 import Data.Foldable (msum)
 
 
@@ -47,11 +43,14 @@ oneOf = msum . map return
 type VarNameCount = Map String Int
 
 type NextTableauID = Int
+initialNextTableauID :: NextTableauID
 initialNextTableauID = 1
 type NextStatementIDs = Map StatementType Int
+initialNextStatementIDs :: Map k a
 initialNextStatementIDs = Map.empty
 
 data RobotState = RobotState NextTableauID NextStatementIDs VarNameCount
+initialRobotState :: RobotState
 initialRobotState = RobotState initialNextTableauID initialNextStatementIDs Map.empty
 
 type RobotM = StateT RobotState (LogicT (ReaderT (PrintingData, Library) Identity))
@@ -73,10 +72,10 @@ putRobotState = put
 
 
 askPrintingData :: RobotM PrintingData
-askPrintingData = fst `liftM` (lift $ lift ask)
+askPrintingData = fst <$> lift (lift ask)
 
 askLibrary :: RobotM Library
-askLibrary = snd `liftM` (lift $ lift ask)
+askLibrary = snd <$> lift (lift ask)
 
 askLibraryResult :: RobotM Result
 askLibraryResult = do
@@ -167,9 +166,13 @@ getVarNameMap  = get
 putVarNameMap :: VarNameMap -> RenameM ()
 putVarNameMap  = put
 
-modifyVarNameMap  = modify
+modifyVarNameMap :: (VarNameMap -> VarNameMap) -> RenameM ()
+modifyVarNameMap = modify
 
+getVarNameCount' :: RenameM VarNameCount
 getVarNameCount' = lift getVarNameCount
+
+putVarNameCount' :: VarNameCount -> RenameM ()
 putVarNameCount' = lift . putVarNameCount
 
 renameNameid :: [(String, ID)] -> (String, ID)  -> Type_ -> RenameM (String, ID)
@@ -198,8 +201,8 @@ fallbacks _ = []
 
 
 renameFormula' :: Formula -> RenameM Formula
-renameFormula' f = mapFormulaM shallow f where
-    bounds = boundNamesInFormula f
+renameFormula' f' = mapFormulaM shallow f' where
+    bounds = boundNamesInFormula f'
 
     shallow :: Formula -> RenameM Formula
     shallow (AtomicFormula pred args) = AtomicFormula pred <$> mapM (mapTermM onTermShallow) args

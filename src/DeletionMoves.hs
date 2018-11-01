@@ -435,7 +435,7 @@ deleteUnmatchableAtomicHypothesis = tableauwise onTableau  where
         guard $ Vulnerable `elem` tags
         guard $ isAtomic f
         guard =<< isUnexpandable f
-        guard . null . filter isBulletedOrDiamonded $ allDirectVariablesInFormula f --no bulleted variable
+        guard . not . any isBulletedOrDiamonded $ allDirectVariablesInFormula f --no bulleted variable
 
         matchesPremiseOf <- matchesPremiseOfM
 

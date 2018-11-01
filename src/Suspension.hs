@@ -4,15 +4,14 @@ module Suspension (
     convertDiamondToBullet
 ) where
 
-import Control.Applicative
+import Prelude hiding (id)
 import Control.Monad
 
-import TexBase
 import Types
 import Move
 import Tex
 import RobotM
-import Writeup
+import Writeup hiding (convert)
 
 ----------------------------------------------------------------------------------------------------
 
@@ -32,12 +31,12 @@ unlockExistentialUniversalConditionalTarget = tableauwise onTableau where
 
     {- TODO: make this affect more cases with more than one target?-}
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left t@(Statement n (
-        Exists evs (ui@(UniversalImplies uvs as c))
+    onTableau _ s (Tableau tID tVs hs (Target [Left t@(Statement n (
+        Exists evs (UniversalImplies uvs as c)
         ) _)])) = do
             as' <- mapM (createStatement STHypothesis) $ markDependencies <$> as
             cs' <- mapM (createStatement STTarget) $ conjuncts c
-            newTableau@(Tableau tID' tVs' hs' t') <- createTableau' True (tagAs (MovedDownFrom tID) <$> as') $ Target (Left <$> cs')
+            Tableau tID' tVs' hs' t' <- createTableau' True (tagAs (MovedDownFrom tID) <$> as') $ Target (Left <$> cs')
             let newTableau' = Tableau tID' (tVs' ++ evs ++ uvs) hs' t'
 --            ui' <- createStatement STTarget ui
             return (MoveDescription [n] [TargetIs [t] {-,Let [Suspended $ addDiamond <$> vs]-}] $
@@ -51,11 +50,11 @@ unlockExistentialTarget = tableauwise onTableau where
 
     {- TODO: make this affect more cases with more than one target?-}
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau _ s tableau@(Tableau tID tVs hs (Target [Left t@(Statement n (
+    onTableau _ s (Tableau tID tVs hs (Target [Left t@(Statement n (
         Exists evs inner
         ) _)])) = do
             inner's <- mapM (createStatement STTarget) $ conjuncts inner
-            newTableau@(Tableau tID' tVs' hs' t') <- createTableau' True [] $ Target (Left <$> inner's)
+            (Tableau tID' tVs' hs' t') <- createTableau' True [] $ Target (Left <$> inner's)
             let newTableau' = Tableau tID' (tVs' ++ evs) hs' t'
 --            ui' <- createStatement STTarget ui
             return (MoveDescription [n] [TargetIs [t] {-,Let [Suspended $ addDiamond <$> vs]-}] $
@@ -69,7 +68,7 @@ convertDiamondToBullet :: MoveType
 convertDiamondToBullet = tableauwise onTableau where
 
     onTableau  :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
-    onTableau inheritedHs s (Tableau tN@(TableauName True tID) tVs hs t) = do
+    onTableau _inheritedHs s (Tableau tN@(TableauName True tID) tVs hs t) = do
         -- find all diamonded variables owned by this tableau
         let diamonded = [v | v@(Variable _ _ _ VTDiamond _) <- tVs]
 
@@ -77,13 +76,12 @@ convertDiamondToBullet = tableauwise onTableau where
         guard . not $ null hs
 
         let convert :: Variable -> Variable
-            convert v@(Variable n id t VTDiamond ds)
-                | v `elem` diamonded = Variable n id t VTBullet ds
+            convert v@(Variable n id t' VTDiamond ds)
+                | v `elem` diamonded = Variable n id t' VTBullet ds
             convert v = v
 
             tableau' = mapVariableInTableau convert $ Tableau (TableauName False tID) tVs hs t
 
         return (MoveDescription [] [AssumeNow hs] $
-                   "Replacing diamonds with bullets in " ++ texTN tN ++ ".",
-                s $ tableau')
+                   "Replacing diamonds with bullets in " ++ texTN tN ++ ".", s tableau')
     onTableau _ _ _ = mzero

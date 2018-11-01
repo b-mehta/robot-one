@@ -119,7 +119,7 @@ main = do
         --            putStrLn "\\vspace{-3mm}"
         --            putStrLn . fit $ tex initialTableau
         --            putStrLn "\\end{center}"
-                    when (not $ lengthAtLeast (max+1) moves) $ do
+                    unless (lengthAtLeast (max+1) moves) $ do
                         putStrLn "\\begin{center}"
                         putStrLn "\\begin{minipage}{120mm}"
                         putStrLn . unwords $ asSentence . writeup pd <$> proof

@@ -113,7 +113,7 @@ splitDisjunctiveHypothesis = tableauwise onTableau where
     onTableau :: [Statement] -> Surroundings -> Tableau -> RobotM (MoveDescription, Tableau)
     onTableau _ s (Tableau tID tVs hs t) = do
         --pick a disjunctive hypothesis
-        ((Statement n (Or fs) _), context) <- oneOf $ eachUndeletedHypothesisWithContext hs
+        (Statement n (Or fs) _, context) <- oneOf $ eachUndeletedHypothesisWithContext hs
 
         --turn the disjuncts into new tableaux
         disjunctHs <- mapM (createStatement STHypothesis) fs
@@ -257,7 +257,7 @@ disjunctivePartsOfTargetOf :: Tableau -> Maybe [Statement]
 disjunctivePartsOfTargetOf (Tableau _ _ _ (Target [p])) = onPart p where
     onPart :: Either Statement [Tableau] -> Maybe [Statement]
     onPart (Left s) = Just [s]
-    onPart (Right ts) = concat <$> mapM disjunctivePartsOfTargetOf ts where
+    onPart (Right ts) = concat <$> mapM disjunctivePartsOfTargetOf ts
 disjunctivePartsOfTargetOf _ = Nothing
 
 matchSingleTargetWithBulletedHypothesis :: MoveType
@@ -423,7 +423,7 @@ rewriteEquality extract = tableauwise onTableau  where
             rewriteTableau = return . mapFormulaInTableau (rewrite t v)
 
         let g :: Either Statement [Tableau] -> RobotM (Either Statement [Tableau])
-            g = either (liftM Left . rewriteStatement STTarget) (liftM Right . mapM rewriteTableau)
+            g = either (fmap Left . rewriteStatement STTarget) (fmap Right . mapM rewriteTableau)
 
         hs' <- mapM (rewriteStatement STHypothesis) $ context []
         --remove any duplicates of old hypotheses
@@ -433,7 +433,7 @@ rewriteEquality extract = tableauwise onTableau  where
         let rewrittenHs = hs'' \\ hs
         guard . not $ null rewrittenHs
 
-        target' <- liftM Target $ mapM g ps
+        target' <- Target <$> mapM g ps
 
         pd <- askPrintingData
         return (MoveDescription [n] [since [h] $ Assertion rewrittenHs] $

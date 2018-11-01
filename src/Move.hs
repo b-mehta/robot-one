@@ -6,14 +6,9 @@ import Control.Applicative
 import Control.Arrow
 --import Control.Monad.RWS hiding (msum)
 import Control.Monad.Logic hiding (msum)
-import Control.Monad.Trans.List
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.Identity hiding (msum)
 --import Control.Monad
 import Data.Either
 import Data.List (nub, sort, intersect)
-import Data.Maybe
-import Data.Map hiding (map, filter, null)
 import Data.Foldable (msum)
 
 import Types
@@ -113,8 +108,8 @@ boundExistentialVariablesInFormula = nub . sort . accumulateFormula immediate wh
     immediate (Not _) = []
     immediate (And _) = []
     immediate (Or _) = []
-    immediate (Forall vs _) = []
-    immediate (UniversalImplies vs _ _) = []
+    immediate (Forall _ _) = []
+    immediate (UniversalImplies _ _ _) = []
     immediate (Exists vs _) = vs
 
 boundUniversalVariablesInFormula :: Formula -> [Variable]
@@ -126,13 +121,15 @@ boundUniversalVariablesInFormula = nub . sort . accumulateFormula immediate wher
     immediate (Or _) = []
     immediate (Forall vs _) = vs
     immediate (UniversalImplies vs _ _) = vs
-    immediate (Exists vs _) = []
+    immediate (Exists _ _) = []
 
 ----------------------------------------------------------------------------------------------------
 
+hypothesesAtAnyDepth :: Tableau -> [Statement]
 hypothesesAtAnyDepth = accumulateTableau extractHypotheses where
     extractHypotheses (Tableau _ _ h's _) = h's
 
+targetFormulaeAtAnyDepth :: Tableau -> [Statement]
 targetFormulaeAtAnyDepth = accumulateTableau extractTargetFormulae where
     extractTargetFormulae (Tableau _ _ _ (Target ps)) = lefts ps
 
@@ -145,8 +142,8 @@ tagAs t s@(Statement n f ts)
 
 tagStatementInTableauAs :: Tag -> StatementName -> Tableau -> Tableau
 tagStatementInTableauAs tag n = mapTableau shallow where
-    shallow (Tableau id vs hs (Target ps)) = Tableau id vs (onStatement <$> hs) . Target $ either (Left . onStatement) Right <$> ps
-    shallow (Tableau id vs hs Contradiction) = Tableau id vs (onStatement <$> hs) Contradiction
+    shallow (Tableau id' vs hs (Target ps)) = Tableau id' vs (onStatement <$> hs) . Target $ either (Left . onStatement) Right <$> ps
+    shallow (Tableau id' vs hs Contradiction) = Tableau id' vs (onStatement <$> hs) Contradiction
     shallow d@(Done _) = d
     onStatement s'@(Statement n' _ _)
         | n == n' = tagAs tag s'
@@ -179,7 +176,7 @@ eachUndeletedTargetPartWithContext = filter (undeletedTP . fst) . eachElementWit
 
 
 addDependencies :: [Variable] -> Variable -> Variable
-addDependencies vs (Variable n id t b (Dependencies ds is)) = Variable n id t b (Dependencies (map VariableTerm vs ++ ds) is)
+addDependencies vs (Variable n id' t b (Dependencies ds is)) = Variable n id' t b (Dependencies (map VariableTerm vs ++ ds) is)
 
 --markDependencies:: Every time you see a \exists, That the dependency of its variable on all
 --                         Previous universally quantified variables
@@ -188,7 +185,7 @@ markDependencies :: Formula -> Formula
 markDependencies = mapFormula shallow where
     shallow f@(AtomicFormula _ _) = f
     shallow f@(Not _) = f
-    shallow f@(And fs) = f
+    shallow f@(And _) = f
     shallow f@(Or _) = f
     shallow (Forall vs c) = Forall vs (addD c) where
         addD = mapFormula (addDependencyToExistential vs)
@@ -197,12 +194,12 @@ markDependencies = mapFormula shallow where
     shallow f@(Exists _ _) = f
 
     addDependencyToExistential :: [Variable] -> Formula -> Formula
-    addDependencyToExistential vs f@(AtomicFormula _ _) = f
-    addDependencyToExistential vs f@(Not _) = f
-    addDependencyToExistential vs f@(And fs) = f
-    addDependencyToExistential vs f@(Or _) = f
-    addDependencyToExistential vs f@(Forall _ _) = f
-    addDependencyToExistential vs f@(UniversalImplies _ _ _) = f
+    addDependencyToExistential _  f@(AtomicFormula _ _) = f
+    addDependencyToExistential _  f@(Not _) = f
+    addDependencyToExistential _  f@(And _) = f
+    addDependencyToExistential _  f@(Or _) = f
+    addDependencyToExistential _  f@(Forall _ _) = f
+    addDependencyToExistential _  f@(UniversalImplies _ _ _) = f
     addDependencyToExistential vs f@(Exists v's _) = mapVariableInFormula mark f where
         mark v
             | v `elem` v's = addDependencies vs v
@@ -223,8 +220,8 @@ isBulletedVariableChoiceLegal (VariableChoice (Variable _ _ _ _ (Dependencies _ 
 -- markBulletedIndependencies vs tableau: mark every bulleted variable in tableau as being independent of vs
 markBulletedIndependencies :: [Variable] -> Tableau -> Tableau
 markBulletedIndependencies vs = mapVariableInTableau shallow where
-    shallow (Variable n id t VTDiamond (Dependencies ds is)) = Variable n id t VTDiamond $ Dependencies ds (is ++ map VariableTerm vs)
-    shallow (Variable n id t VTBullet (Dependencies ds is))  = Variable n id t VTBullet $ Dependencies ds (is ++ map VariableTerm vs)
+    shallow (Variable n id' t VTDiamond (Dependencies ds is)) = Variable n id' t VTDiamond $ Dependencies ds (is ++ map VariableTerm vs)
+    shallow (Variable n id' t VTBullet (Dependencies ds is))  = Variable n id' t VTBullet $ Dependencies ds (is ++ map VariableTerm vs)
     shallow v = v
 
 ----------------------------------------------------------------------------------------------------
@@ -234,9 +231,9 @@ markBulletedIndependencies vs = mapVariableInTableau shallow where
 conjuncts :: Formula -> [Formula]
 conjuncts f@(AtomicFormula _ _) = [f]
 conjuncts f@(Not _) = [f]
-conjuncts f@(And fs) = concatMap conjuncts fs
+conjuncts   (And fs) = concatMap conjuncts fs
 conjuncts f@(Or _) = [f]
 conjuncts f@(Forall _ _) = [f]
 conjuncts f@(UniversalImplies _ _ _) = [f]
-conjuncts f@(Exists _ f') = [f]
+conjuncts f@(Exists _ _) = [f]
 

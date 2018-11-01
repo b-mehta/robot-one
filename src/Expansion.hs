@@ -19,8 +19,8 @@ primaryExpansion' :: Formula -> RobotM (Maybe (Matching, Formula))
 primaryExpansion' f = do
     et <- askLibraryExpansionTable
     return . listToMaybe $ do
-        (pattern, expansion) <- et
-        matching <- maybeToList $ match pattern f
+        (patt, expansion) <- et
+        matching <- maybeToList $ match patt f
         return (matching, expansion)
 --    return $ transform matching expansion
 
@@ -53,8 +53,8 @@ rewriteTerm :: Term -> RobotM (Maybe Term)
 rewriteTerm t = do
     rt <- askLibraryRewriteTable
     return . listToMaybe $ do
-        (pattern, vs, rewriteTo) <- rt
-        matching <- maybeToList $ matchTerm pattern vs t
+        (patt, vs, rewriteTo) <- rt
+        matching <- maybeToList $ matchTerm patt vs t
         return $ transformTerm matching rewriteTo
 
 rewriteTermIfPossible :: Term -> RobotM Term
