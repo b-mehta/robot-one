@@ -12,8 +12,8 @@ import Data.List
 
 ----------------------------------------------------------------------------------------------------
 
-data Function = Function String                                             deriving (Eq, Ord, Show)
-data Predicate = Predicate String                                           deriving (Eq, Ord, Show)
+newtype Function = Function String                                          deriving (Eq, Ord, Show)
+newtype Predicate = Predicate String                                        deriving (Eq, Ord, Show)
 
 type ID = Int
 type HasBullet = Bool  --TODO: rename to isKey/hasDagger

@@ -23,7 +23,7 @@ import Writeup
 
 
 data MoveDescription = MoveDescription [StatementName] [Clause] String
-data MoveType = MoveType (Tableau -> RobotM (MoveDescription, Tableau))
+newtype MoveType = MoveType (Tableau -> RobotM (MoveDescription, Tableau))
 
 movetypeFromSubmovetypes :: [MoveType] -> MoveType
 movetypeFromSubmovetypes ms = MoveType $ \t -> msum [f t | MoveType f <- ms]
